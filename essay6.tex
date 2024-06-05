@@ -1,0 +1,114 @@
+\documentclass[a4j,10pt, twocolumn]{jarticle} \usepackage[dvipdfmx]{graphicx} \usepackage{amssymb} \usepackage{amsmath}
+\usepackage{float}
+\usepackage[compact]{titlesec}
+\usepackage{fancyhdr}
+\usepackage{afterpage}
+\usepackage{caption}
+%---------------------------------------------------
+% ページの設定
+%---------------------------------------------------
+\setlength{\textwidth}{179truemm}
+\setlength{\textheight}{260truemm}
+\setlength{\topmargin}{-14.5truemm}
+\setlength{\oddsidemargin}{-9.5truemm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{}
+\fancyhead[C]{}
+\fancyhead[R]{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[L]{}
+\fancyfoot[C]{}
+\fancyfoot[R]{}
+\renewcommand{\footrulewidth}{0pt}
+\setlength{\headheight}{-2truemm}
+\setlength{\parindent}{1zw}
+
+\begin{document}
+\twocolumn
+[
+\begin{center}
+  {\huge NAISTにて取り組みたい研究について}
+\end{center}
+\vspace{3truemm}
+]
+
+\rhead{
+  \normalsize{%
+  氏名: CUIENCHENG　試験区分: 情報科学区分　希望研究室: ソーシャル・コンピューティング研究室
+  }
+}
+\section{はじめに}
+\subsection{NAISTで取り組みたいこと}
+奈良先端科学技術大学院大学で取り組みたい研究テーマ は「SNSから抽出したテキストを対象としたセンチメンタル分析に関する研究」である。本稿では、研究テーマの研究背景・課題、提案内容、研究手法、予想される結果、これまでの修学内容について述べる。
+
+\section{研究の概要}
+\subsection{研究の背景・課題 }
+オンラインで生成されたユーザーコンテンツから意見を発見し、理解することは、多岐にわたる応用にとって重要である。例えば、電子商取引サイトのレビューを分析することで、特定の製品やサービスのどのaspectが高く評価されているか、
+または改善が必要かを把握できる。しかし、膨大な量のテキストを考慮すると、意見情報を手動で消化するのは非現実的である。そのため、テキストに隠された意見と感情を分析する自動計算フレームワークの設計が必要となり、Aspect-based Sentiment Analysis(ABSA)が注目されている。
+
+普通の感情分析問題は、ターゲットと感情二つ要素の分析に取り込んでいるが\cite{liu}、ABSAにおいては、ターゲットと感情をさらに細かく分けて、メインに4つの要素の抽出を行う。ターゲットはAspect Category(c)またはAspect Term(a)で表現する。一方、感情は詳細なOpinion Term(t)とSentiment polarity(p)で分けられる。これらの要素を単独で抽出する、あるいは複数の要素を一括りにセンチメントタプルとして抽出する、
+\begin{figure}[b]
+    \centering
+    \includegraphics[scale=0.5]{infe.drawio.png}
+    \caption{本研究で提案するモデルのpipeline}
+    \label{fig:enter-label}
+\end{figure}この様にABSAは様々なの種類がある。
+ASQp(Aspect Sentiment Quad prediction)で例を挙げると、
+Input(X) = "Rolls were big, but not good,and sashimi wasn't fresh." という入力の場合、\\
+Output(y) = (Rolls, Food, big, positive), (Rolls, Food, not good, Negative),(sashimi, Food, n't fresh, Negative)という出力が期待され、それぞれのタプルが要因と感情の関係を示している。
+
+\subsection{提案内容}
+最近Bart、T5などのLLMは様々な分野で応用され、発展を続けている。text-to-text問題を解く形で、一回で全ての答えを生成するのが、ABSAの主流となっている\cite{zhang1}。この方法である程度の結果は得たが\cite{yan}、seq2seqモデルにおける時系列を考慮した文章生成タスクとは異なり、ABSAのタスクは順序を考慮する必要がなく、未だ改善の余地があると考える。前の例で説明すると(Rolls, Food, not good, Negative)が(Rolls, Food, big, positive)の後にあるのには特別な意味はない。しかし、従来の方法では、学習・推論する際、前のタプルは後ろのタプルの条件となってしまう。
+さらにタプル単位で見た場合も、a, c, o, s四つの要素に対しての順序は本来、重要ではない。
+ 本研究はこのような生成順序がもたらす影響を消すために、SotaであるMvpモデル\cite{mvp}で使われたprompt方法とseq2pathモデル\cite{seq2path}のpathとして学習する方法二つを組み合わせ、以上の既存手法モデルと比較して、さらなる性能向上の達成を目指す。
+
+\subsection{研究手法}
+モデルの全体的な構成は図1に示してある。
+\subsubsection{タプル内順序を示すprompting}
+モデルにとって、一つの順序は一つの視点と捉えることができる。このように捉えることで、一つの視点という制約を排除し、複数の視点を導入することが考えられる。\\
+　このように考えると、異なる順序（四つの要素の全24通り）のpromptに基づいて、モデルにさまざまな視点から複数のタプルを生成することができる。また、推論時\\
+\vspace{7cm}
+\\
+\\において、一致するタプルを集約し、半数を超えたタプルを最終結果とすることで(図1のpart3を参考)、視点単一、あるいは順序が制約となる問題を解決することができる。\\
+　具体的なprompt方法はMvpを参考に、Input textに"[a][c][o][s]"で示される特殊tokenをつけるpromptingを導入する。
+例えば、以下のようになる。\\
+Input (X):Rolls were big. [o][a][c][s]\\
+Output (y): ([o]big, [a]Rolls, [c]Food, [s]positive) \\
+上のように、Inputに対して[o][a][c][s]の順序でpromptを行った場合、そのpromptの順番に対応する順序でOutputが出力されるように学習される。
+\subsubsection{pathとしての学習}
+ABSAにおいて、ある時点でのtokenが推論された際、その次のtokenを一つに限定するよりも、複数あると考えられる。一つの期待される出力のtokenから複数の候補をpathとして捉えて、学習する手法がSeq2pathから提案された。この手法では、falseケースを取り入れたデータ拡張を行い、その上で、データ構造をpathとして捉えることで、Beam Searchで推論できるフレームワークを示している。
+具体的には、図２の左部分を例に挙げると、最初の\textless bos\textgreater tokenから二つのpathが伸びており、それぞれの\textless Rolls\textgreater と\textless sashimi\textgreater に対して確率が0.5ずつになる。このように一つの候補ではなく、複数の候補（path）を考えて学習を行う。
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=1\linewidth]{seq2.png}
+  \caption{promptによるpath構造の違い}
+  \label{fig:enter-label}
+\end{figure}
+\subsubsection{prompting+path学習}
+以上のpromptingとpath学習を組み合わせることを考える。図2のように、promptingの順番に応じて、出力順序が変わるため、それに合うようにpathの接続も変更される。このようにすることで、promptを用いた学習を行いながら、pathライクな学習を可能にする。
+さらに、この二つを組み合わせることにより、推論時にBeam SearchとAggrigation（図1のpart2とpart3）を組み合わせることが可能になる。これにより、より信頼された結果を得ることができると考える。実際には、falseケースを示す\\
+\\([false])を最終項に導入したデータ拡張を行うことも想定している。
+
+\section{予想される結果}
+Seq2pathは1-to-1ではなく1-to-nで学習を行うことができるようになる。しかし、依然として、タプル内の順序に影響を受けてしまう問題があった。Mvpは、独自のpromptingを導入したことにより、タプル内の順序の影響に対してロバストな学習を行うことができる手法である。自身の提案手法においては、この二つの手法を組み合わせることにより、pathとしての学習をさせつつ、タプル内の順序の制約に対処できる仕組みを構築した。タプル内の順番とpathのつながりを連携させることで、二つの手法の良い部分を取り入れることになり、結果として、この二つの手法以上の精度が期待できると考えている。
+\section{これまでの修学内容}
+学部の卒業論文は四つのセラミック合金材料が送風機アルミニウム製ファンブレードの修復工事への応用に関する研究を行った。アルミニウム材質の特性を考慮し、適切なセラミック合金材料を選び、実験から実用価値の評価まで行うことができた。\\
+　卒業した後、Chatgptから衝撃を受け、AIに興味が湧いて、独学でAIの学習に取り込んだ。自身が四ヶ国語を話せることから、特にNLpに強い関心を持って、基礎的な学習や論文の調査を行っている。
+
+\begin{thebibliography}{5}
+\bibitem{liu}
+  B. Liu, “Sentiment analysis and opinion mining,”Synthesis lectures on human language technologies, vol. 5,no. 1, pp. 1–167, 2012.
+\bibitem{zhang1}
+  Wenxuan Zhang, Xin Li, Yang Deng, Lidong Bing, and Wai Lam.2022. A survey on aspect-based sentiment analysis: Tasks, methods, and challenges. CoRR,
+abs/2203.01054.
+\bibitem{yan}
+Hang Yan, Junqi Dai, Xipeng Qiu, Zheng Zhang,et al. 2021. A unified generative framework for aspect-based sentiment analysis. arXiv preprint
+arXiv:2106.04300.
+\bibitem{mvp}
+Zhibin Gou, Qingyan Guo, Yujiu Yang. 2023.Mvp: Multi-view prompting Improves Aspect Sentiment Tuple prediction. arXiv
+preprint arXiv:2305.12627
+\bibitem{seq2path}
+Yue Mao, Yi Shen, Jingchao Yang, Xiaoying Zhu, and Longjun Cai. 2022. Seq2path: Generating Sentiment Tuples as paths of a Tree. ACL 2022, pages 2215–2225, Dublin, Ireland. Association for Computational Linguistics.
+\end{thebibliography}
+\end{document}
